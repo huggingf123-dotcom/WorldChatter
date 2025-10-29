@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>World Chat 🌎</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@joeattardi/emoji-button@4.6.4/dist/index.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@joeattardi/emoji-button@4.6.4/dist/index.min.js"></script>
+<style>
+  :root {
+    --bg-light: #f8f8f8;
+    --bg-dark: #111;
+    --tile-light: #fff;
+    --tile-dark: #1e1e1e;
+    --border-light: #ddd;
+    --border-dark: #333;
+    --text-light: #111;
+    --text-dark: #f5f5f5;
+    --accent-light: #ccc;
+    --accent-dark: #444;
+  }
+
+  body {
+    margin: 0;
+    font-family: "Inter", sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background: var(--bg-light);
+    color: var(--text-light);
+    transition: background 0.3s, color 0.3s;
+  }
+  body.dark {
+    background: var(--bg-dark);
+    color: var(--text-dark);
+  }
+
+  .chat-wrapper {
+    width: 90%;
+    max-width: 50%;
+    height: 70vh;
+    min-height: 500px;
+    background: var(--tile-light);
+    border: 1px solid var(--border-light);
+    border-radius: 18px;
+    box-shadow: 0 6px 25px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: all 0.3s ease;
+  }
+  body.dark .chat-wrapper {
+    background: #282828;
+    border-color: var(--border-dark);
+    box-shadow: 0 6px 25px rgba(255,255,255,0.05);
+  }
+
+  .chat-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border-light);
+  }
+  body.dark .chat-header { border-bottom-color: var(--border-dark); }
+  .chat-header h1 { margin: 0; font-size: 18px; font-weight: 600; }
+  #onlineCount { font-size: 14px; opacity: 0.8; }
+  #themeToggle {
+    background: none;
+    border: 1px solid var(--accent-light);
+    border-radius: 8px;
+    padding: 6px 10px;
+    cursor: pointer;
+    transition: 0.2s;
+  }
+  body.dark #themeToggle { border-color: var(--accent-dark); color: var(--text-dark); }
+  #themeToggle:hover { opacity: 0.7; }
+
+  #chatContainer {
+    flex: 1;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    gap: 8px;
+  }
+
+  .message { display: flex; align-items: flex-end; gap: 8px; }
+  .message.self { justify-content: flex-end; }
+  .avatar {
+    width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+  }
+
+  .bubble {
+    padding: 10px 14px;
+    border-radius: 14px;
+    max-width: 70%;
+    line-height: 1.4;
+    font-size: 15px;
+    background: var(--accent-light);
+    color: var(--text-light);
+  }
+  .bubble.self { background: #666; color: white; }
+  body.dark .bubble { background: #2b2b2b; color: var(--text-dark); }
+  body.dark .bubble.self { background: #888; color: black; }
+
+  .notice {
+    text-align: center;
+    opacity: 0.5;
+    font-size: 14px;
+    margin: 8px 0;
+  }
+
+  .chat-input {
+    display: flex;
+    padding: 10px 14px;
+    border-top: 1px solid var(--border-light);
+    background: var(--tile-light);
+  }
+  body.dark .chat-input {
+    background: var(--tile-dark);
+    border-top-color: var(--border-dark);
+  }
+  #messageInput {
+    flex: 1; padding: 10px 14px; border: 1px solid var(--border-light);
+    border-radius: 20px; outline: none; background: transparent; color: inherit;
+  }
+  body.dark #messageInput { border-color: var(--accent-dark); }
+  #sendBtn {
+    margin-left: 10px; padding: 10px 16px; border: none; border-radius: 20px;
+    background: #555; color: white; cursor: pointer; font-weight: 600; transition: 0.2s;
+  }
+  #sendBtn:hover { background: #333; }
+
+  @media(max-width: 480px){ .chat-wrapper { height: 520px; } }
+</style>
+</head>
+<body>
+  <div class="chat-wrapper">
+    <div class="chat-header">
+      <h1>World Chat 🌎</h1>
+      <div id="onlineCount">0 online</div>
+      <button id="themeToggle">☀️ / 🌙</button>
+    </div>
+
+    <div id="chatContainer"></div>
+
+<div class="chat-input" style="display: flex; align-items: center; gap: 6px; position: relative;">
+  <button id="emojiBtn" style="font-size: 22px; cursor: pointer; background: none; border: none;">😊</button>
+  <input id="messageInput" type="text" placeholder="Type a message..." style="flex: 1;" />
+  <button id="sendBtn">Send</button>
+
+  <!-- ✅ Add this inside the chat-input, so it anchors nicely -->
+  <div id="gifContainer"
+       style="position: absolute; bottom: 50px; left: 10px;
+              display: none; background: white; border-radius: 10px;
+              padding: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+              z-index: 9999; width: 320px; max-height: 250px;
+              overflow-y: auto;">
+  </div>
+</div>
+
+
+
+
+  </div>
+<script>
+const chatContainer = document.getElementById("chatContainer");
+const messageInput = document.getElementById("messageInput");
+const sendBtn = document.getElementById("sendBtn");
+const themeToggle = document.getElementById("themeToggle");
+
+const adjectives = ["Curious","Lazy","Brave","Silly","Happy","Wild","Sneaky","Mighty","Tiny","Swift","Loud","Gentle","Crazy","Smiling","Grumpy","Cheerful"];
+const animals = ["Elephant","Tiger","Penguin","Panda","Fox","Koala","Shark","Eagle","Otter","Unicorn","Sloth","Raccoon","Bear","Dolphin","Frog","Wolf","Rabbit","Cat"];
+
+function generateUsername(){
+  const adj = adjectives[Math.floor(Math.random()*adjectives.length)];
+  const ani = animals[Math.floor(Math.random()*animals.length)];
+  const unique = Math.floor(Math.random()*9999);
+  return `${adj}${ani}${unique}`;
+}
+
+const username = generateUsername();
+const userId = (window.crypto && window.crypto.randomUUID)
+  ? window.crypto.randomUUID()
+  : 'xxxxxx-xxxx-4xxx-yxxx-xxxxxx'.replace(/[xy]/g, c => {
+      const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+
+const userColor = ['#B794F4','#4F46E5','#F472B6','#6B7280','#000000'][Math.floor(Math.random()*5)];
+const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+const ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws`);
+
+
+ws.onopen = () => console.log("Connected as", username);
+
+ws.onmessage = (event) => {
+  try {
+    let msg = JSON.parse(event.data);
+    if (msg.system) {
+      if (msg.type === "count")
+        document.getElementById("onlineCount").textContent = `${msg.count} online`;
+      if (msg.type === "notice") {
+        const notice = document.createElement("div");
+        notice.className = "notice";
+        notice.textContent = msg.text;
+        chatContainer.appendChild(notice);
+      }
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+      return;
+    }
+
+    // ✅ Handle GIFs or text separately
+    if (msg.text && (msg.text.includes(".gif") || msg.text.includes("tenor.com"))) {
+      addMessage(`<img src="${msg.text.trim()}" style="max-width:200px;border-radius:10px;">`, msg.userId === userId, msg.color);
+    } else if (msg.text) {
+      addMessage(`${msg.name || "??"}: ${msg.text}`, msg.userId === userId, msg.color);
+    }
+  } catch (err) {
+    console.error("Error:", err);
+  }
+};
+
+function addMessage(text, isSelf, color){
+  const msgDiv = document.createElement("div");
+  msgDiv.className = "message " + (isSelf ? "self" : "other");
+
+  const avatar = document.createElement("div");
+  avatar.className = "avatar";
+  avatar.style.backgroundColor = color;
+
+  const bubble = document.createElement("div");
+  bubble.className = "bubble " + (isSelf ? "self" : "other");
+  bubble.innerHTML = text; // support images
+
+  if (isSelf) {
+    msgDiv.appendChild(bubble);
+    msgDiv.appendChild(avatar);
+  } else {
+    msgDiv.appendChild(avatar);
+    msgDiv.appendChild(bubble);
+  }
+
+  chatContainer.appendChild(msgDiv);
+  chatContainer.scrollTop = chatContainer.scrollHeight;
+}
+
+function sendMessage() {
+  const text = messageInput.value.trim();
+  const gifPreview = document.getElementById("gifPreview");
+  const gifUrl = gifPreview?.dataset?.url;
+
+  if (!text && !gifUrl) return;
+
+  // ✅ If both text and GIF exist, send both messages in order
+  if (gifUrl && text) {
+    // send text first
+    ws.send(JSON.stringify({
+      text,
+      userId,
+      color: userColor,
+      name: username
+    }));
+
+    // then send GIF
+    ws.send(JSON.stringify({
+      text: gifUrl,
+      userId,
+      color: userColor,
+      name: username
+    }));
+  }
+  // ✅ If only one exists
+  else {
+    ws.send(JSON.stringify({
+      text: gifUrl || text,
+      userId,
+      color: userColor,
+      name: username
+    }));
+  }
+
+  messageInput.value = "";
+  if (gifPreview) gifPreview.remove();
+}
+
+sendBtn.addEventListener("click", sendMessage);
+messageInput.addEventListener("keypress", (e) => { if (e.key === "Enter") sendMessage(); });
+themeToggle.addEventListener("click", () => document.body.classList.toggle("dark"));
+addMessage(`👋 Welcome ${username}!`, true, userColor);
+</script>
+
+<!-- ✅ EmojiMart v5 Modern Emoji Picker -->
+<script src="https://cdn.jsdelivr.net/npm/emoji-mart@5.5.2/dist/browser.js"></script>
+<!-- Combined Emoji + GIF Picker -->
+<script type="module">
+import "https://cdn.jsdelivr.net/npm/emoji-picker-element@^1/index.js";
+
+window.addEventListener("DOMContentLoaded", () => {
+  const emojiBtn = document.getElementById("emojiBtn");
+  const input = document.getElementById("messageInput");
+  const sendBtn = document.getElementById("sendBtn");
+
+  const pickerContainer = document.createElement("div");
+  Object.assign(pickerContainer.style, {
+    position: "absolute",
+    display: "none",
+    zIndex: "9999",
+    background: "white",
+    border: "1px solid #ccc",
+    borderRadius: "10px",
+    overflow: "hidden",
+    width: "320px",
+    height: "400px",
+    boxShadow: "0 4px 15px rgba(0,0,0,0.2)"
+  });
+  document.body.appendChild(pickerContainer);
+
+  const tabBar = document.createElement("div");
+  Object.assign(tabBar.style, {
+    display: "flex",
+    borderBottom: "1px solid #ddd",
+    background: "#f3f3f3"
+  });
+
+  const emojiTab = document.createElement("button");
+  emojiTab.textContent = "😊 Emojis";
+  const gifTab = document.createElement("button");
+  gifTab.textContent = "🎬 GIFs";
+
+  [emojiTab, gifTab].forEach(btn => {
+    Object.assign(btn.style, {
+      flex: "1", padding: "8px", border: "none",
+      cursor: "pointer", fontWeight: "600"
+    });
+  });
+
+  tabBar.appendChild(emojiTab);
+  tabBar.appendChild(gifTab);
+  pickerContainer.appendChild(tabBar);
+
+  const emojiPicker = document.createElement("emoji-picker");
+  emojiPicker.style.width = "100%";
+  emojiPicker.style.height = "330px";
+  pickerContainer.appendChild(emojiPicker);
+
+  const gifContainer = document.createElement("div");
+  gifContainer.style.display = "none";
+  gifContainer.style.padding = "8px";
+  gifContainer.style.overflowY = "auto";
+  gifContainer.style.height = "330px";
+  pickerContainer.appendChild(gifContainer);
+
+  const gifSearch = document.createElement("input");
+  Object.assign(gifSearch, { type: "text", placeholder: "Search GIFs..." });
+  Object.assign(gifSearch.style, {
+    width: "90%", margin: "6px", padding: "6px",
+    border: "1px solid #ddd", borderRadius: "6px",
+    fontSize: "14px", outline: "none"
+  });
+  gifContainer.appendChild(gifSearch);
+
+  const gifGrid = document.createElement("div");
+  gifGrid.id = "gifGrid";
+  Object.assign(gifGrid.style, {
+    display: "flex", flexWrap: "wrap", justifyContent: "center", marginTop: "6px"
+  });
+  gifContainer.appendChild(gifGrid);
+
+  emojiTab.addEventListener("click", () => {
+    emojiPicker.style.display = "block";
+    gifContainer.style.display = "none";
+    emojiTab.style.background = "#fff";
+    gifTab.style.background = "#f3f3f3";
+  });
+
+  gifTab.addEventListener("click", () => {
+    emojiPicker.style.display = "none";
+    gifContainer.style.display = "block";
+    gifTab.style.background = "#fff";
+    emojiTab.style.background = "#f3f3f3";
+    loadGifs("jethalal");
+  });
+
+  emojiPicker.addEventListener("emoji-click", (event) => {
+    input.value += event.detail.unicode;
+    pickerContainer.style.display = "none";
+  });
+
+  let searchTimeout;
+  gifSearch.addEventListener("input", (e) => {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+      loadGifs(e.target.value || "funny");
+    }, 500);
+  });
+
+  async function loadGifs(query = "funny") {
+    gifGrid.innerHTML = "⏳ Loading...";
+    try {
+      const res = await fetch(`/tenor?query=${encodeURIComponent(query)}`);
+      const data = await res.json();
+      gifGrid.innerHTML = "";
+      data.results?.forEach((gif) => {
+        const img = document.createElement("img");
+        img.src = gif.media_formats?.tinygif?.url || gif.media[0]?.gif?.url;
+        Object.assign(img.style, {
+          width: "47%", height: "90px", objectFit: "cover",
+          borderRadius: "8px", margin: "4px", cursor: "pointer"
+        });
+
+        img.addEventListener("click", () => {
+          // Show preview beside send button
+          let gifPreview = document.getElementById("gifPreview");
+          if (!gifPreview) {
+            gifPreview = document.createElement("img");
+            gifPreview.id = "gifPreview";
+            Object.assign(gifPreview.style, {
+              width: "50px", height: "50px", borderRadius: "8px",
+              marginRight: "6px", objectFit: "cover"
+            });
+            document.querySelector(".chat-input").insertBefore(gifPreview, sendBtn);
+          }
+          gifPreview.src = img.src;
+          gifPreview.dataset.url = img.src;
+          pickerContainer.style.display = "none";
+        });
+
+        gifGrid.appendChild(img);
+      });
+    } catch (err) {
+      gifGrid.innerHTML = "❌ Failed to load GIFs.";
+      console.error("GIF error:", err);
+    }
+  }
+
+  emojiBtn.addEventListener("click", () => {
+    const rect = emojiBtn.getBoundingClientRect();
+    pickerContainer.style.left = `${rect.left}px`;
+    pickerContainer.style.bottom = `${window.innerHeight - rect.top + 10}px`;
+    pickerContainer.style.display =
+      pickerContainer.style.display === "none" ? "block" : "none";
+  });
+});
+</script>
+
+</body>
+</html>
