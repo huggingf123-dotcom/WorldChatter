@@ -511,6 +511,31 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 });
 </script>
+<script src="https://www.google.com/recaptcha/api.js?render=6Ldp7_srAAAAANHHYfgSTHCxyTXpigt3NOOgO4LQ"></script>
+<script>
+(async () => {
+  // Automatically get CAPTCHA token on page load
+  grecaptcha.ready(async () => {
+    const token = await grecaptcha.execute("YOUR_SITE_KEY_HERE", { action: "chat_access" });
+
+    // Verify with backend
+    const res = await fetch("/verify_captcha", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    });
+
+    const data = await res.json();
+    if (!data.success) {
+      alert("Bot protection failed. Please refresh and try again.");
+      document.body.innerHTML = "<h2>Access Denied 🚫</h2>";
+    } else {
+      console.log("✅ CAPTCHA verified, connecting to chat...");
+      startChat();
+    }
+  });
+})();
+</script>
 
 </body>
 </html>
