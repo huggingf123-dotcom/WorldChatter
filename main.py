@@ -11,8 +11,14 @@ import httpx
 import os
 from dotenv import load_dotenv
 from fastapi.staticfiles import StaticFiles
+from cryptography.fernet import Fernet
 
 load_dotenv()
+
+
+FERNET_KEY = os.getenv("FERNET_KEY")
+fernet = Fernet(FERNET_KEY)
+
 
 TENOR_API_KEY = os.getenv("TENOR_API_KEY")
 REDIS_URL = os.getenv("REDIS_URL")
@@ -21,6 +27,11 @@ CHANNEL = "chatroom"
 active_connections = set()
 
 r = redis.from_url(REDIS_URL, decode_responses=True)
+
+
+RECAPTCHA_SECRET = os.getenv("RECAPTCHA_SECRET")
+
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -49,6 +60,28 @@ async def get_tenor_gifs(query: str = "funny"):
             return {"error": f"Failed to fetch from Tenor ({res.status_code})"}
         return res.json()
 
+
+
+@app.post("/verify_captcha")
+async def verify_captcha(data: dict):
+    token = data.get("token")
+    if not token:
+        return {"success": False, "error": "missing token"}
+
+    async with httpx.AsyncClient() as client:
+        res = await client.post(
+            "https://www.google.com/recaptcha/api/siteverify",
+            data={"secret": RECAPTCHA_SECRET, "response": token},
+        )
+        result = res.json()
+
+    # Only accept if score > 0.5
+    if result.get("success") and result.get("score", 0) > 0.5:
+        return {"success": True}
+    return {"success": False, "error": result}
+
+
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
@@ -60,8 +93,11 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         while True:
             data = await websocket.receive_text()
-            print("Received data:", data)
-            r.publish(CHANNEL, data)
+            # print("Received data:", data)
+            encrypted_data = fernet.encrypt(data.encode()).decode()
+            print("Encrypted data:", encrypted_data)
+
+            r.publish(CHANNEL, encrypted_data)
     except WebSocketDisconnect:
         active_connections.discard(websocket)
         print("Client disconnected")
@@ -70,7 +106,7 @@ async def websocket_endpoint(websocket: WebSocket):
         print("WebSocket error:", e)
 
 async def broadcast(message: str):
-    print("Broadcasting:", message)
+    # print("Broadcasting:", message)
     for conn in list(active_connections):
         try:
             await conn.send_text(message)
@@ -91,9 +127,14 @@ def redis_subscriber(loop):
     print(f"✅ Subscribed to Redis channel: {CHANNEL}")
     for msg in pubsub.listen():
         if msg["type"] == "message":
-            data = msg["data"]
-            print("📨 Received from Redis:", data)
-            asyncio.run_coroutine_threadsafe(broadcast(data), loop)
+            encrypted_data = msg["data"]
+            try:
+                # 🔓 Decrypt message
+                decrypted_data = fernet.decrypt(encrypted_data.encode()).decode()
+                # print("📨 Decrypted message from Redis:", decrypted_data)
+                asyncio.run_coroutine_threadsafe(broadcast(decrypted_data), loop)
+            except Exception as e:
+                print("⚠️ Failed to decrypt:", e)
 
 @app.get("/client.html")
 def get_client():
